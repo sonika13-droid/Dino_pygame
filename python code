@@ -1,0 +1,401 @@
+import pygame
+import os
+import random
+import matplotlib.pyplot as plt
+import sys
+from tabulate import tabulate
+import mysql.connector as mysql
+connection=mysql.connect(host='localhost',database='project', user='root', password='123456')
+cursor=connection.cursor()
+
+
+#input of user name
+pygame.init()
+window = pygame.display.set_mode((1100, 600))
+clock = pygame.time.Clock()
+ 
+font = pygame.font.Font('freesansbold.ttf',50)
+name = ""
+input_active = True
+
+run = True
+while run:
+    clock.tick(60)
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            run = False
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            input_active = True
+            name = ""
+        elif event.type == pygame.KEYDOWN and input_active:
+            if event.key == pygame.K_RETURN:
+                input_active = False
+            elif event.key == pygame.K_BACKSPACE:
+                name =  name[:-1]
+            elif event.key == pygame.K_ESCAPE:
+                run = False
+                
+            else:
+                name += event.unicode
+        if event.type == pygame.K_TAB:
+            running=False
+
+        window.fill(0)
+        text_surf = font.render(name, True, ( 10, 150,255))
+        window.blit(text_surf, text_surf.get_rect(center = window.get_rect().center))
+        pygame.display.flip()
+
+
+
+
+
+#GAME SCREEN AND IMAGES
+pygame.init()
+SCREEN_HEIGHT = 600
+SCREEN_WIDTH = 1100
+SCREEN = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+
+RUNNING = [pygame.image.load(os.path.join("resources","dino2.png")),
+           pygame.image.load(os.path.join("resources","dino3.png"))]
+JUMPING = pygame.image.load(os.path.join("resources","dino1.png"))
+DUCKING = [pygame.image.load(os.path.join("resources","dino4.png")),
+           pygame.image.load(os.path.join("resources","dino5.png"))]
+
+SMALL_CACTUS = [pygame.image.load(os.path.join("resources","cactus-small1.png")),
+                pygame.image.load(os.path.join("resources","cactus-small2.png")),
+                pygame.image.load(os.path.join("resources","cactus-small3.png"))]
+LARGE_CACTUS = [pygame.image.load(os.path.join("resources","cactus-big1.png")),
+                pygame.image.load(os.path.join("resources","cactus-big2.png")),
+                pygame.image.load(os.path.join("resources","cactus-big3.png"))]
+
+BIRD = [pygame.image.load(os.path.join("resources","voador1.png")),
+        pygame.image.load(os.path.join("resources","voador2.png"))]
+
+CLOUD = pygame.image.load(os.path.join("resources","cloud.png"))
+
+BG = pygame.image.load(os.path.join("resources","Track1.png"))
+
+jump=pygame.mixer.Sound(os.path.join("resources","jump.wav"))
+die=pygame.mixer.Sound(os.path.join("resources","die.wav"))
+check=pygame.mixer.Sound(os.path.join("resources","checkPoint.wav"))
+
+#setting up classes
+
+class Dinosaur:
+    
+    X_POS = 80
+    Y_POS = 305.5
+    Y_POS_DUCK = 325
+    JUMP_VEL = 8.0
+    
+    def __init__(self):
+        self.duck_img = DUCKING
+        self.run_img = RUNNING
+        self.jump_img = JUMPING
+
+        self.dino_duck = False
+        self.dino_run = True
+        self.dino_jump = False
+
+        self.step_index = 0
+        self.jump_vel=self.JUMP_VEL
+        self.image = self.run_img[0]
+        self.dino_rect = self.image.get_rect()
+        self.dino_rect.x = self.X_POS
+        self.dino_rect.y = self.Y_POS
+
+    def update(self, userInput):
+        if self.dino_duck:
+            self.duck()
+        if self.dino_run:
+            self.run()
+        if self.dino_jump:
+            self.jump()
+
+        if self.step_index >= 10:
+            self.step_index = 0
+# syncing keys with the game
+        if userInput[pygame.K_UP] or userInput[pygame.K_SPACE] and not self.dino_jump:
+            self.dino_duck = False
+            self.dino_run = False
+            self.dino_jump = True
+            pygame.mixer.Sound.play(jump)
+           
+        elif userInput[pygame.K_DOWN] and not self.dino_jump:
+            self.dino_duck = True
+            self.dino_run = False
+            self.dino_jump = False
+        elif not (self.dino_jump or userInput[pygame.K_DOWN]):
+            self.dino_duck = False
+            self.dino_run = True
+            self.dino_jump = False
+
+    def jump(self):
+        self.image = self.jump_img
+        if self.dino_jump:
+            self.dino_rect.y -= self.jump_vel * 4
+            self.jump_vel -= 0.8
+        if self.jump_vel < - self.JUMP_VEL:
+            self.dino_jump = False
+            self.jump_vel = self.JUMP_VEL
+   
+    def run(self):
+        self.image = self.run_img[self.step_index // 5]
+        self.dino_rect = self.image.get_rect()
+        self.dino_rect.x = self.X_POS
+        self.dino_rect.y = self.Y_POS
+        self.step_index += 1
+
+    def duck(self):
+        self.image = self.duck_img[self.step_index // 5]
+        self.dino_rect = self.image.get_rect()
+        self.dino_rect.x = self.X_POS
+        self.dino_rect.y = self.Y_POS_DUCK
+        self.step_index += 1
+        
+    def draw(self, SCREEN):
+        SCREEN.blit(self.image, (self.dino_rect.x, self.dino_rect.y))
+
+
+class Cloud:
+    def __init__(self):
+        self.x = SCREEN_WIDTH + random.randint(800, 1000)
+        self.y = random.randint(50, 100)
+        self.image = CLOUD
+        self.width = self.image.get_width()
+
+    def update(self):
+        self.x -= game_speed
+        
+        if self.x < -self.width:
+            self.x = SCREEN_WIDTH + random.randint(2500, 3000)
+            self.y = random.randint(50, 100)
+
+    def draw(self, SCREEN):
+        SCREEN.blit(self.image, (self.x, self.y))
+
+
+
+
+class Obstacle:
+    def __init__(self, image, type):
+        self.image = image
+        self.type = type
+        self.rect = self.image[self.type].get_rect()
+        self.rect.x = SCREEN_WIDTH
+
+    def update(self):
+        self.rect.x -= game_speed
+        if self.rect.x < -self.rect.width:
+            obstacles.pop()
+
+    def draw(self, SCREEN):
+        SCREEN.blit(self.image[self.type], self.rect)
+
+
+class SmallCactus(Obstacle):
+    def __init__(self, image):
+        self.type = random.randint(0, 2)
+        super().__init__(image, self.type)
+        self.rect.y = 280.5
+
+
+class LargeCactus(Obstacle):
+    def __init__(self, image):
+        self.type = random.randint(0, 2)
+        super().__init__(image, self.type)
+        self.rect.y = 260
+
+        
+
+class Bird(Obstacle):
+    def __init__(self, image):
+        self.type = 0
+        super().__init__(image, self.type)
+        self.rect.y = random.randrange(200,310)
+        self.index = 0
+
+    def draw(self, SCREEN):
+        if self.index >= 9:
+            self.index = 0
+        SCREEN.blit(self.image[self.index//5], self.rect)
+        self.index += 1
+
+
+
+def main():
+    global game_speed,x_pos_bg, y_pos_bg, points,obstacles
+    run=True
+    clock = pygame.time.Clock()
+    player = Dinosaur()
+    game_speed = 14
+    cloud=Cloud()
+    x_pos_bg=0
+    y_pos_bg=340
+    points=0
+    font = pygame.font.Font('freesansbold.ttf', 20)
+    obstacles=[]
+    death_count=0
+
+
+    
+    def score():
+        global points, game_speed
+        points += 1
+        if points % 100 == 0:
+            game_speed += 2
+        if points % 1000==0:
+            pygame.mixer.Sound.play(check)
+        text = font.render("Points: " + str(points), True, (0, 0, 0))
+        textRect = text.get_rect()
+        textRect.center = (1000, 40)
+        SCREEN.blit(text, textRect) 
+    
+    def background():
+        global x_pos_bg, y_pos_bg
+        image_width = BG.get_width()
+        SCREEN.blit(BG, (x_pos_bg, y_pos_bg))
+        SCREEN.blit(BG, (image_width + x_pos_bg, y_pos_bg))
+        if x_pos_bg <= -image_width:
+            SCREEN.blit(BG, (image_width + x_pos_bg, y_pos_bg))
+            x_pos_bg = 0
+        x_pos_bg -= game_speed
+
+#Main game loop
+
+    while run:
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                run = False
+        SCREEN.fill((255, 255, 255))
+        userInput = pygame.key.get_pressed()
+
+        player.draw(SCREEN)
+        player.update(userInput)
+
+        if len(obstacles) == 0:
+            if random.randint(0, 2) == 0:
+                obstacles.append(SmallCactus(SMALL_CACTUS))
+            elif random.randint(0, 2) == 1:
+                obstacles.append(LargeCactus(LARGE_CACTUS))
+            elif random.randint(0, 2) == 2:
+                obstacles.append(Bird(BIRD))
+
+        for obstacle in obstacles:
+            obstacle.draw(SCREEN)
+            obstacle.update()
+            if player.dino_rect.colliderect(pygame.Rect.inflate(obstacle.rect,-30,-44)):
+                pygame.mixer.Sound.play(die)
+                pygame.time.delay(2000)
+                
+                death_count += 1
+
+                #Storing names and scores ito sql table
+                
+                sql="insert into scores values(%s,%s)"
+                val=(name,points)
+                cursor.execute(sql,val)
+                connection.commit()
+                sql="select * from scores"
+                cursor.execute(sql)
+                results=cursor.fetchall()
+                print(tabulate(results,headers=["player name","score"],tablefmt='psql'))
+               
+                menu(death_count)
+            
+               
+        background()     
+        cloud.draw(SCREEN)
+        cloud.update()
+        score()
+        clock.tick(30)
+        pygame.display.update()
+       
+#Death window
+   
+def menu(death_count):
+    global points,name
+    
+    run = True
+    while run:
+        SCREEN.fill((255, 255, 255))
+        font = pygame.font.Font('freesansbold.ttf', 30)
+   
+        if death_count == 0:
+            text = font.render("Press any Key to Start", True, (0, 0, 0))
+        elif death_count > 0:
+            text = font.render("Press any Key to Restart", True, (0, 0, 0))
+
+            score = font.render("Your Score: " + str(points), True, (0, 0, 0))
+            scoreRect = score.get_rect()
+            scoreRect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50)
+            SCREEN.blit(score, scoreRect)
+            
+            progress= font.render("*PRESS P TO CHECK PROGRESS*", True, (0,0,0))
+            progRect=progress.get_rect()
+            progRect.center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 150)
+            SCREEN.blit(progress, progRect)
+
+          # displaying the high scores
+          
+            s=str("select max(score) from score")
+            cursor.execute(s)
+            result=cursor.fetchall()
+            results=str(result)
+            q=results.replace("[("," ")
+            a=q.replace(",)]", " ")
+
+            high=font.render("High Score: " + str(a), True, (0, 0, 0))
+            highRect = high.get_rect()
+            highRect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 100)
+            SCREEN.blit(high,highRect)
+            
+            
+        textRect = text.get_rect()
+        textRect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+        SCREEN.blit(text, textRect)
+        SCREEN.blit(RUNNING[0], (SCREEN_WIDTH // 2 - 20, SCREEN_HEIGHT // 2 - 140))
+       
+            
+        pygame.display.update()
+
+        #Loop for death menu
+       
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                run = False
+                quit()
+                sys.exit()
+            
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_p:
+
+                    #Generating graph for progress of the current player
+                    
+                    sql="select score from scores where name = %s"
+                    names=(name,)
+                    cursor.execute(sql,names)
+                    r=cursor.fetchall()
+                    l1=[]
+
+                    for x in r:
+                        y=list(x)
+                        l1.append(y)
+                    flatList = [element for innerList in l1 for element in innerList]
+                    print(flatList)
+
+                    plt.plot(flatList,marker="*",ms=10,mec="black",mfc="cyan")
+                    plt.title("YOUR PROGRESS")
+                    plt.xlabel("ATTEMPTS")
+                    plt.ylabel("YOUR SCORES")
+                    plt.show()
+                    
+                else:  
+                    main()
+
+           
+
+
+menu(death_count=0)
