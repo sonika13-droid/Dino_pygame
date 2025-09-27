@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import sys
 from tabulate import tabulate
 import mysql.connector as mysql
-connection=mysql.connect(host='localhost',database='project', user='root', password='123456')
+connection=mysql.connect(host='localhost',database='project', user='root', password='123456') # add your password
 cursor=connection.cursor()
 
 
